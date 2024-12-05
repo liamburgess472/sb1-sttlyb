@@ -89,7 +89,7 @@ export function InfluencerProfile() {
   }, [id]);
 
   // Loading, error, and profile rendering sections remain the same
-}
+
 
 
   if (loading) {
