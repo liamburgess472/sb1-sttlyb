@@ -18,6 +18,8 @@ const SocialIcon = {
   tiktok: TikTok,
 };
 
+// Import statements remain the same
+
 export function InfluencerProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,18 +31,18 @@ export function InfluencerProfile() {
   useEffect(() => {
     async function loadInfluencer() {
       if (!id) return;
-      
+
       try {
+        // Fetch influencer details
         const { data, error: influencerError } = await supabase
-          .from('influencers')
-          .select('*')
-          .eq('id', id)
+          .from("influencers")
+          .select("*")
+          .eq("id", id)
           .single();
 
-        if (influencerError) throw influencerError;
-        if (!data) throw new Error('Influencer not found');
+        if (influencerError || !data) throw new Error("Influencer not found");
 
-        const formattedInfluencer: Influencer = {
+        setInfluencer({
           id: data.id,
           name: data.name,
           avatar: data.avatar_url,
@@ -49,20 +51,35 @@ export function InfluencerProfile() {
           socialMedia: data.social_media || [],
           specialties: data.specialties || [],
           followers: data.followers,
-          recipesCount: data.recipes_count
-        };
+          recipesCount: data.recipes_count,
+        });
 
-        setInfluencer(formattedInfluencer);
+        // Fetch recipes
+        const { data: recipes, error: recipesError } = await supabase
+          .from("recipes")
+          .select(
+            `id, title, image_url, prep_time, cook_time, influencer:influencers (id, name, avatar_url)`
+          )
+          .eq("influencer.id", id);
 
-        // Load recipes for this influencer
-        const recipes = await RecipeService.getAll();
-        const influencerRecipes = recipes.filter(recipe => 
-          recipe.influencer.id === id
+        if (recipesError) throw recipesError;
+
+        setRecipes(
+          recipes.map((recipe) => ({
+            id: recipe.id,
+            title: recipe.title,
+            image: recipe.image_url,
+            prepTime: recipe.prep_time,
+            cookTime: recipe.cook_time,
+            influencer: {
+              id: recipe.influencer.id,
+              name: recipe.influencer.name,
+              avatar: recipe.influencer.avatar_url,
+            },
+          }))
         );
-        setRecipes(influencerRecipes);
-
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load influencer');
+        setError(err instanceof Error ? err.message : "Failed to load influencer");
       } finally {
         setLoading(false);
       }
@@ -70,6 +87,10 @@ export function InfluencerProfile() {
 
     loadInfluencer();
   }, [id]);
+
+  // Loading, error, and profile rendering sections remain the same
+}
+
 
   if (loading) {
     return (
@@ -80,16 +101,18 @@ export function InfluencerProfile() {
   }
 
   if (error || !influencer) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-2xl font-bold mb-4">Influencer not found</h2>
-        <p className="text-muted-foreground mb-6">{error || "The requested influencer could not be found."}</p>
-        <Button onClick={() => navigate("/influencers")} variant="outline">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to influencers
-        </Button>
-      </div>
-    );
+  return (
+    <div className="flex flex-col items-center justify-center py-12">
+      <h2 className="text-2xl font-bold mb-4">Influencer not found</h2>
+      <p className="text-muted-foreground mb-6">
+        {error || "The requested influencer could not be found. Please try again later."}
+      </p>
+      <Button onClick={() => navigate("/influencers")} variant="outline">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to influencers
+      </Button>
+    </div>
+  );
   }
 
   return (
@@ -150,24 +173,28 @@ export function InfluencerProfile() {
 
           {/* Social Media */}
           <div className="mt-8 flex justify-center gap-4">
-            {influencer.socialMedia.map((social) => {
-              const Icon = SocialIcon[social.platform];
-              return (
-                <Button
-                  key={social.platform}
-                  variant="outline"
-                  size="lg"
-                  className="gap-2"
-                  asChild
-                >
-                  <a href={social.url} target="_blank" rel="noopener noreferrer">
-                    <Icon className="h-5 w-5" />
-                    {social.username}
-                  </a>
-                </Button>
-              );
-            })}
-          </div>
+  {influencer.socialMedia.length > 0 ? (
+    influencer.socialMedia.map((social) => {
+      const Icon = SocialIcon[social.platform];
+      return (
+        <Button
+          key={social.platform}
+          variant="outline"
+          size="lg"
+          className="gap-2"
+          asChild
+        >
+          <a href={social.url} target="_blank" rel="noopener noreferrer">
+            <Icon className="h-5 w-5" />
+            {social.username}
+          </a>
+        </Button>
+      );
+    })
+  ) : (
+    <p className="text-muted-foreground">No social media links available.</p>
+  )}
+</div>
         </div>
       </div>
 
