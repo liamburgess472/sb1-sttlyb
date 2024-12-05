@@ -1,24 +1,47 @@
-import { type Recipe } from '@/types/recipe';
-import { supabase } from '@/lib/supabase';
+import { type Recipe } from "@/types/recipe";
+import { supabase } from "@/lib/supabase";
 
 export const RecipeService = {
-  getAll: async (): Promise<Recipe[]> => {
-    const { data: recipes, error } = await supabase
-      .from('recipes')
-      .select(`
-        *,
+  getAll: async (filters?: { tag?: string; limit?: number }): Promise<Recipe[]> => {
+    const query = supabase
+      .from("recipes")
+      .select(
+        `
+        id,
+        title,
+        description,
+        image_url,
+        prep_time,
+        cook_time,
+        servings,
+        calories,
+        tags,
+        ingredients,
+        instructions,
+        nutritional_info,
         influencer:influencers (
           id,
           name,
           avatar_url
         )
-      `)
-      .order('created_at', { ascending: false });
+      `
+      )
+      .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    // Apply filters if provided
+    if (filters?.tag) {
+      query.contains("tags", [filters.tag]);
+    }
+    if (filters?.limit) {
+      query.limit(filters.limit);
+    }
+
+    const { data: recipes, error } = await query;
+
+    if (error) throw new Error(`Error fetching recipes: ${error.message}`);
     if (!recipes) return [];
 
-    return recipes.map(recipe => ({
+    return recipes.map((recipe) => ({
       id: recipe.id,
       title: recipe.title,
       description: recipe.description,
@@ -33,27 +56,44 @@ export const RecipeService = {
       nutritionalInfo: recipe.nutritional_info,
       influencer: {
         id: recipe.influencer?.id,
-        name: recipe.influencer?.name || 'Unknown',
-        avatar: recipe.influencer?.avatar_url || '',
-      }
+        name: recipe.influencer?.name || "Unknown",
+        avatar: recipe.influencer?.avatar_url || "",
+      },
     }));
   },
 
   getById: async (id: string): Promise<Recipe | null> => {
     const { data: recipe, error } = await supabase
-      .from('recipes')
-      .select(`
-        *,
+      .from("recipes")
+      .select(
+        `
+        id,
+        title,
+        description,
+        image_url,
+        prep_time,
+        cook_time,
+        servings,
+        calories,
+        tags,
+        ingredients,
+        instructions,
+        nutritional_info,
         influencer:influencers (
           id,
           name,
           avatar_url
         )
-      `)
-      .eq('id', id)
+      `
+      )
+      .eq("id", id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching recipe:", error);
+      throw new Error(`Error fetching recipe with ID ${id}: ${error.message}`);
+    }
+
     if (!recipe) return null;
 
     return {
@@ -71,15 +111,15 @@ export const RecipeService = {
       nutritionalInfo: recipe.nutritional_info,
       influencer: {
         id: recipe.influencer?.id,
-        name: recipe.influencer?.name || 'Unknown',
-        avatar: recipe.influencer?.avatar_url || ''
-      }
+        name: recipe.influencer?.name || "Unknown",
+        avatar: recipe.influencer?.avatar_url || "",
+      },
     };
   },
 
-  create: async (recipe: any): Promise<Recipe> => {
+  create: async (recipe: Omit<Recipe, "id">): Promise<Recipe> => {
     const { data, error } = await supabase
-      .from('recipes')
+      .from("recipes")
       .insert({
         title: recipe.title,
         description: recipe.description,
@@ -91,51 +131,26 @@ export const RecipeService = {
         tags: recipe.tags,
         ingredients: recipe.ingredients,
         instructions: recipe.instructions,
-        influencer_id: recipe.influencerId
+        influencer_id: recipe.influencer.id,
       })
-      .select(`
-        *,
-        influencer:influencers (
-          id,
-          name,
-          avatar_url
-        )
-      `)
+      .select()
       .single();
 
     if (error) {
-      console.error('Error creating recipe:', error);
-      throw new Error(error.message);
+      console.error("Error creating recipe:", error);
+      throw new Error("Failed to create recipe");
     }
 
     if (!data) {
-      throw new Error('Failed to create recipe - no data returned');
+      throw new Error("Failed to create recipe - no data returned");
     }
 
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      image: data.image_url,
-      prepTime: data.prep_time,
-      cookTime: data.cook_time,
-      servings: data.servings,
-      calories: data.calories,
-      tags: data.tags || [],
-      ingredients: data.ingredients || [],
-      instructions: data.instructions || [],
-      nutritionalInfo: data.nutritional_info,
-      influencer: {
-        id: data.influencer?.id,
-        name: data.influencer?.name || 'Unknown',
-        avatar: data.influencer?.avatar_url || ''
-      }
-    };
+    return await RecipeService.getById(data.id); // Ensure strict type
   },
 
-  update: async (id: string, updates: any): Promise<Recipe> => {
+  update: async (id: string, updates: Partial<Recipe>): Promise<Recipe> => {
     const { data, error } = await supabase
-      .from('recipes')
+      .from("recipes")
       .update({
         title: updates.title,
         description: updates.description,
@@ -147,52 +162,22 @@ export const RecipeService = {
         tags: updates.tags,
         ingredients: updates.ingredients,
         instructions: updates.instructions,
-        influencer_id: updates.influencerId
+        influencer_id: updates.influencer?.id,
       })
-      .eq('id', id)
-      .select(`
-        *,
-        influencer:influencers (
-          id,
-          name,
-          avatar_url
-        )
-      `)
+      .eq("id", id)
+      .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw new Error(`Error updating recipe with ID ${id}: ${error.message}`);
 
-    if (!data) {
-      throw new Error('Failed to update recipe - no data returned');
-    }
+    if (!data) throw new Error("Failed to update recipe - no data returned");
 
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      image: data.image_url,
-      prepTime: data.prep_time,
-      cookTime: data.cook_time,
-      servings: data.servings,
-      calories: data.calories,
-      tags: data.tags || [],
-      ingredients: data.ingredients || [],
-      instructions: data.instructions || [],
-      nutritionalInfo: data.nutritional_info,
-      influencer: {
-        id: data.influencer?.id,
-        name: data.influencer?.name || 'Unknown',
-        avatar: data.influencer?.avatar_url || ''
-      }
-    };
+    return await RecipeService.getById(id); // Ensure strict type
   },
 
   delete: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('recipes')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from("recipes").delete().eq("id", id);
 
-    if (error) throw error;
-  }
+    if (error) throw new Error(`Error deleting recipe with ID ${id}: ${error.message}`);
+  },
 };
