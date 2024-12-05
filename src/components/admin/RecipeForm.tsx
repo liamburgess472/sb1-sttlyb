@@ -54,7 +54,7 @@ export function RecipeForm({ open, onOpenChange, editingRecipe }: RecipeFormProp
         tags: editingRecipe.tags.join(', '),
         ingredients: editingRecipe.ingredients || [],
         instructions: editingRecipe.instructions || [],
-        influencerId: editingRecipe.influencer.id || ''
+        influencerId: editingRecipe.influencer || ''
       });
     } else {
       setFormData({
